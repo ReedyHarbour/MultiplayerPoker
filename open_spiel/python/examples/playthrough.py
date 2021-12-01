@@ -33,9 +33,9 @@ from open_spiel.python.algorithms import generate_playthrough
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
-    "game", "kuhn_poker", "Name of the game, with optional parameters, e.g. "
+    "game", "kuhn_poker(players=3)", "Name of the game, with optional parameters, e.g. "
     "'kuhn_poker' or 'go(komi=4.5,board_size=19)'.")
-flags.DEFINE_string("output_file", None, "Where to write the data to.")
+flags.DEFINE_string("output_file", "output.txt", "Where to write the data to.")
 flags.DEFINE_list("actions", None,
                   "A (possibly partial) list of action choices to make.")
 
@@ -66,7 +66,7 @@ def main(unused_argv):
         f.write(text)
     else:
       logging.info(text)
-
+ 
 
 if __name__ == "__main__":
   app.run(main)

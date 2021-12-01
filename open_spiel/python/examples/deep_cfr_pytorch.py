@@ -23,20 +23,20 @@ from absl import flags
 from absl import logging
 
 from open_spiel.python import policy
-from open_spiel.python.algorithms import expected_game_score
+from open_spiel.python.algorithms import expected_game_score, best_response
 import pyspiel
 from open_spiel.python.pytorch import deep_cfr
-
+import pickle
 FLAGS = flags.FLAGS
 
-flags.DEFINE_integer("num_iterations", 400, "Number of iterations")
-flags.DEFINE_integer("num_traversals", 40, "Number of traversals/games")
+flags.DEFINE_integer("num_iterations", 10000, "Number of iterations")
+flags.DEFINE_integer("num_traversals", 4, "Number of traversals/games")
 flags.DEFINE_string("game_name", "kuhn_poker", "Name of the game")
-
+flags.DEFINE_integer("players", 3, "Number of players")
 
 def main(unused_argv):
   logging.info("Loading %s", FLAGS.game_name)
-  game = pyspiel.load_game(FLAGS.game_name)
+  game = pyspiel.load_game(FLAGS.game_name, {'players': 3})
 
   deep_cfr_solver = deep_cfr.DeepCFRSolver(
       game,
@@ -66,11 +66,21 @@ def main(unused_argv):
   logging.info("Deep CFR in '%s' - NashConv: %s", FLAGS.game_name, conv)
 
   average_policy_values = expected_game_score.policy_value(
-      game.new_initial_state(), [average_policy] * 2)
-  logging.info("Computed player 0 value: %.2f (expected: %.2f).",
-               average_policy_values[0], -1 / 18)
-  logging.info("Computed player 1 value: %.2f (expected: %.2f).",
-               average_policy_values[1], 1 / 18)
+      game.new_initial_state(), [average_policy] * 3)
+  epsilon = 0
+  for i in range(FLAGS.players):
+    best_resp_backend = best_response.BestResponsePolicy(
+          game, i, average_policy)
+    br_policy = [average_policy] * FLAGS.players
+    br_policy[i] = best_resp_backend
+    br_policy_value = expected_game_score.policy_value(
+      game.new_initial_state(), br_policy)
+    print("Best response player {} value {}".format(i, br_policy_value[i]))
+    epsilon = max(br_policy_value[i] - average_policy_values[i], epsilon)
+  print("Epsilon: " + str(epsilon))
+  print("Persisting the model...")
+  with open("{}_solver.pickle".format("deep_cfr"), "wb") as file:
+    pickle.dump(deep_cfr_solver, file, pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":

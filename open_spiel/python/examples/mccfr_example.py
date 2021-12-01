@@ -21,6 +21,8 @@ from __future__ import print_function
 from absl import app
 from absl import flags
 
+import pickle
+from open_spiel.python.algorithms import expected_game_score, best_response
 from open_spiel.python.algorithms import exploitability
 from open_spiel.python.algorithms import external_sampling_mccfr as external_mccfr
 from open_spiel.python.algorithms import outcome_sampling_mccfr as outcome_mccfr
@@ -36,8 +38,8 @@ flags.DEFINE_enum(
 )
 flags.DEFINE_integer("iterations", 10000, "Number of iterations")
 flags.DEFINE_string("game", "kuhn_poker", "Name of the game")
-flags.DEFINE_integer("players", 2, "Number of players")
-flags.DEFINE_integer("print_freq", 1000,
+flags.DEFINE_integer("players", 4, "Number of players")
+flags.DEFINE_integer("print_freq", 1,
                      "How often to print the exploitability")
 
 
@@ -54,6 +56,22 @@ def main(_):
       conv = exploitability.nash_conv(game, cfr_solver.average_policy())
       print("Iteration {} exploitability {}".format(i, conv))
 
+  average_policy = cfr_solver.average_policy()
+  average_policy_values = expected_game_score.policy_value(
+      game.new_initial_state(), [average_policy] * FLAGS.players)
+  for i in range(FLAGS.players):
+    best_resp_backend = best_response.BestResponsePolicy(
+          game, i, average_policy)
+    br_policy = [average_policy] * FLAGS.players
+    br_policy[i] = best_resp_backend
+    br_policy_value = expected_game_score.policy_value(
+      game.new_initial_state(), br_policy)
+    print("Best response player {} value {}".format(i, br_policy_value[i]))
+  epsilon = max([br_policy_value[i] - average_policy_values[i] for i in range(FLAGS.players)])
+  print("Epsilon: " + str(epsilon))
+  print("Persisting the model...")
+  with open("{}_solver.pickle".format("cfr_py_2"), "wb") as file:
+    pickle.dump(cfr_solver, file, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
   app.run(main)

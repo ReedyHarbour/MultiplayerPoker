@@ -40,6 +40,7 @@ import numpy as np
 import tensorflow as tf
 
 from open_spiel.python import policy
+from open_spiel.python.algorithms import exploitability
 import pyspiel
 
 
@@ -271,7 +272,7 @@ class DeepCFRSolver(policy.Policy):
                batch_size_advantage: int = 2048,
                batch_size_strategy: int = 2048,
                memory_capacity: int = int(1e6),
-               policy_network_train_steps: int = 5000,
+               policy_network_train_steps: int = 10000,
                advantage_network_train_steps: int = 750,
                reinitialize_advantage_networks: bool = True,
                save_advantage_networks: str = None,
@@ -425,7 +426,7 @@ class DeepCFRSolver(policy.Policy):
         'legal_actions': tf.io.FixedLenFeature([self._num_actions], tf.float32)
     }
 
-  def solve(self):
+  def solve(self, game):
     """Solution logic for Deep CFR."""
     advantage_losses = collections.defaultdict(list)
     with tf.device(self._infer_device):
@@ -448,7 +449,7 @@ class DeepCFRSolver(policy.Policy):
                                f'advnet_p{p}_it{self._iteration:04}'))
           self._iteration += 1
     # Train policy network.
-    policy_loss = self._learn_strategy_network()
+    policy_loss = self._learn_strategy_network(game)
     return self._policy_network, advantage_losses, policy_loss
 
   def save_policy_network(self, outputfolder):
@@ -706,7 +707,7 @@ class DeepCFRSolver(policy.Policy):
     data = data.prefetch(tf.data.experimental.AUTOTUNE)
     return data
 
-  def _learn_strategy_network(self):
+  def _learn_strategy_network(self, game):
     """Compute the loss over the strategy network.
 
     Returns:
@@ -731,5 +732,10 @@ class DeepCFRSolver(policy.Policy):
       data = self._get_strategy_dataset()
       for d in data.take(self._policy_network_train_steps):
         main_loss = train_step(*d)
+        average_policy = policy.tabular_policy_from_callable(
+                  game, self.action_probabilities)   
+        conv = exploitability.nash_conv(game, average_policy)
+        with open("deep_cfr_5", "a+") as f:
+          f.write(str(conv) + "\n")
 
     return main_loss

@@ -27,10 +27,10 @@ import pyspiel
 FLAGS = flags.FLAGS
 
 flags.DEFINE_enum("solver", "cfr", ["cfr", "cfrplus", "cfrbr"], "CFR solver")
-flags.DEFINE_integer("iterations", 20, "Number of iterations")
+flags.DEFINE_integer("iterations", 10000, "Number of iterations")
 flags.DEFINE_string("game", "kuhn_poker", "Name of the game")
-flags.DEFINE_integer("players", 2, "Number of players")
-
+flags.DEFINE_integer("players", 3, "Number of players")
+ 
 
 def main(_):
   game = pyspiel.load_game(
@@ -44,12 +44,17 @@ def main(_):
     solver = pyspiel.CFRPlusSolver(game)
   elif FLAGS.solver == "cfrbr":
     solver = pyspiel.CFRBRSolver(game)
-
-  for i in range(int(FLAGS.iterations / 2)):
+  exp = []
+  for i in range(int(FLAGS.iterations)):
     solver.evaluate_and_update_policy()
+    exp_curr = pyspiel.exploitability(game, solver.average_policy())
+    exp.append(str(exp_curr))
     print("Iteration {} exploitability: {:.6f}".format(
-        i, pyspiel.exploitability(game, solver.average_policy())))
-
+        i, exp_curr))
+  
+  with open("cfr_3p", "w+") as file:
+    file.write("\n".join(exp))
+  '''
   print("Persisting the model...")
   with open("{}_solver.pickle".format(FLAGS.solver), "wb") as file:
     pickle.dump(solver, file, pickle.HIGHEST_PROTOCOL)
@@ -59,12 +64,11 @@ def main(_):
     loaded_solver = pickle.load(file)
   print("Exploitability of the loaded model: {:.6f}".format(
       pyspiel.exploitability(game, loaded_solver.average_policy())))
+  '''
 
-  for i in range(int(FLAGS.iterations / 2)):
-    loaded_solver.evaluate_and_update_policy()
-    print("Iteration {} exploitability: {:.6f}".format(
-        int(FLAGS.iterations / 2) + i,
-        pyspiel.exploitability(game, loaded_solver.average_policy())))
+  print("Persisting the model...")
+  with open("{}_solver_3.pickle".format(FLAGS.solver), "wb") as file:
+    pickle.dump(solver, file, pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":

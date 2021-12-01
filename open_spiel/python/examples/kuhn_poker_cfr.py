@@ -22,25 +22,40 @@ from absl import app
 
 from open_spiel.python.algorithms import cfr
 from open_spiel.python.algorithms import expected_game_score
+from open_spiel.python.algorithms import best_response
 import pyspiel
+import pickle
 
-
+num_players = 4
 def main(_):
-  game = pyspiel.load_game("kuhn_poker")
+  game = pyspiel.load_game("kuhn_poker", {"players": num_players},)
 
   cfr_solver = cfr.CFRSolver(game)
-  iterations = 1000
+  iterations = 5000
 
   for i in range(iterations):
-    cfr_value = cfr_solver.evaluate_and_update_policy()
-    print("Game util at iteration {}: {}".format(i, cfr_value))
+    cfr_solver.evaluate_and_update_policy()
+    cfr_value = cfr_solver.average_policy()
+    cfr_util = expected_game_score.policy_value(
+      game.new_initial_state(), [cfr_value] * num_players)
+    print("Game util at iteration {}: {}".format(i, cfr_util))
 
   average_policy = cfr_solver.average_policy()
   average_policy_values = expected_game_score.policy_value(
-      game.new_initial_state(), [average_policy] * 2)
-  print("Computed player 0 value: {}".format(average_policy_values[0]))
-  print("Expected player 0 value: {}".format(-1 / 18))
-
+      game.new_initial_state(), [average_policy] * num_players)
+  for i in range(num_players):
+    best_resp_backend = best_response.BestResponsePolicy(
+          game, i, average_policy)
+    br_policy = [average_policy] * num_players
+    br_policy[i] = best_resp_backend
+    br_policy_value = expected_game_score.policy_value(
+      game.new_initial_state(), br_policy)
+    print("Best response player {} value {}".format(i, br_policy_value[i]))
+  epsilon = max([br_policy_value[i] - average_policy_values[i] for i in range(num_players)])
+  print("Epsilon: " + str(epsilon))
+  print("Persisting the model...")
+  with open("{}_solver.pickle".format("cfr_py_4"), "wb") as file:
+    pickle.dump(cfr_solver, file, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
   app.run(main)

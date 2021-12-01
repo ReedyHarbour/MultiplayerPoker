@@ -27,17 +27,17 @@ from open_spiel.python.algorithms import deep_cfr_tf2
 from open_spiel.python.algorithms import expected_game_score
 from open_spiel.python.algorithms import exploitability
 import pyspiel
-
+import pickle
 FLAGS = flags.FLAGS
 
 flags.DEFINE_integer("num_iterations", 100, "Number of iterations")
-flags.DEFINE_integer("num_traversals", 150, "Number of traversals/games")
-flags.DEFINE_string("game_name", "leduc_poker", "Name of the game")
+flags.DEFINE_integer("num_traversals", 100, "Number of traversals/games")
+flags.DEFINE_string("game_name", "kuhn_poker", "Name of the game")
 
 
 def main(unused_argv):
   logging.info("Loading %s", FLAGS.game_name)
-  game = pyspiel.load_game(FLAGS.game_name)
+  game = pyspiel.load_game(FLAGS.game_name, {"players": 5})
   deep_cfr_solver = deep_cfr_tf2.DeepCFRSolver(
       game,
       policy_network_layers=(64, 64, 64, 64),
@@ -53,7 +53,7 @@ def main(unused_argv):
       reinitialize_advantage_networks=True,
       infer_device="cpu",
       train_device="cpu")
-  _, advantage_losses, policy_loss = deep_cfr_solver.solve()
+  _, advantage_losses, policy_loss = deep_cfr_solver.solve(game)
   for player, losses in advantage_losses.items():
     logging.info("Advantage for player %d: %s", player,
                  losses[:2] + ["..."] + losses[-2:])
@@ -70,10 +70,15 @@ def main(unused_argv):
   logging.info("Deep CFR in '%s' - NashConv: %s", FLAGS.game_name, conv)
 
   average_policy_values = expected_game_score.policy_value(
-      game.new_initial_state(), [average_policy] * 2)
+      game.new_initial_state(), [average_policy] * 5)
   print("Computed player 0 value: {}".format(average_policy_values[0]))
   print("Computed player 1 value: {}".format(average_policy_values[1]))
-
+  print("Computed player 2 value: {}".format(average_policy_values[2]))
+  print("Computed player 3 value: {}".format(average_policy_values[3]))
+  print("Computed player 4 value: {}".format(average_policy_values[4]))
+  print("Persisting the model...")
+  with open("{}_solver.pickle".format("deep_cfr_5"), "wb") as file:
+    pickle.dump(average_policy, file, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
   app.run(main)

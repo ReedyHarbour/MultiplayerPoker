@@ -67,7 +67,7 @@ class PolicyBot(pyspiel.Bot):
     action_list = list(policy.keys())
     if not any(action_list):
       return [], pyspiel.INVALID_ACTION
-
+    policy[0] = 1 - sum(list(policy.values())) + policy[0]
     action = self._rng.choice(action_list, p=list(policy.values()))
     return list(policy.items()), action
 

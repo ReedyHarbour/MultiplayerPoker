@@ -68,16 +68,16 @@ class Calculator(object):
   """Class to orchestrate the calculation."""
 
   def __init__(self, game):
-    if game.num_players() != 2:
-      raise ValueError("Only supports 2-player games.")
+    # if game.num_players() != 2:
+    #   raise ValueError("Only supports 2-player games.")
     self.game = game
     self._num_players = game.num_players()
     self._num_actions = game.num_distinct_actions()
 
     self._action_value_calculator = action_value.TreeWalkCalculator(game)
     # best_responder[i] is a best response to the provided policy for player i.
-    # It is therefore a policy for player (1-i).
-    self._best_responder = {0: None, 1: None}
+    # It is therefore tabular policies for the opponent players.
+    self._best_responder = {player: {op: None for op in range(self._num_players)} for player in range(self._num_players)}
     self._all_states = None
 
   def __call__(self, player, player_policy, info_states):
@@ -94,12 +94,16 @@ class Calculator(object):
       A `_CalculatorReturn` nametuple. See its docstring for the documentation.
     """
     self.player = player
-    opponent = 1 - player
+    opponents = list(range(self._num_players))
+    opponents.remove(self.player)
+    # opponent = 1 - player
 
-    def best_response_policy(state):
-      infostate = state.information_state_string(opponent)
-      action = best_response_actions[infostate]
-      return [(action, 1.0)]
+    def best_response_policy_for_opponent(opponent):
+      def best_response_policy(state):
+        infostate = state.information_state_string(opponent)
+        action = best_response_actions[opponent][infostate]
+        return [(action, 1.0)]
+      return best_response_policy
 
     # If the policy is a TabularPolicy, we can directly copy the infostate
     # strings & values from the class. This is significantly faster than having
@@ -129,26 +133,28 @@ class Calculator(object):
 
     # When constructed, TabularBestResponse does a lot of work; we can save that
     # work by caching it.
-    if self._best_responder[player] is None:
-      self._best_responder[player] = pyspiel.TabularBestResponse(
-          self.game, opponent, tabular_policy)
-    else:
-      self._best_responder[player].set_policy(tabular_policy)
+    for opponent in opponents:
+      if self._best_responder[player][opponent] is None:
+        self._best_responder[player][opponent] = pyspiel.TabularBestResponse(
+            self.game, opponent, tabular_policy)
+      else:
+        self._best_responder[player][opponent].set_policy(tabular_policy)
 
     # Computing the value at the root calculates best responses everywhere.
-    best_response_value = self._best_responder[player].value_from_state(
-        self.game.new_initial_state())
-    best_response_actions = self._best_responder[
-        player].get_best_response_actions()
-
+    best_response_value = 0
+    best_response_actions = {op: None for op in opponents}
+    for opponent in opponents:
+      best_response_value += self._best_responder[player][opponent].value_from_state(
+          self.game.new_initial_state())
+      best_response_actions[opponent] = self._best_responder[
+          player][opponent].get_best_response_actions()
+    policies = dict()
+    policies[player] = player_policy
+    for op in opponents:
+      policies[op] = policy.tabular_policy_from_callable(
+                self.game, best_response_policy_for_opponent(op), [op])
     # Compute action values
-    self._action_value_calculator.compute_all_states_action_values({
-        player:
-            player_policy,
-        opponent:
-            policy.tabular_policy_from_callable(
-                self.game, best_response_policy, [opponent]),
-    })
+    self._action_value_calculator.compute_all_states_action_values(policies)
     obj = self._action_value_calculator._get_tabular_statistics(  # pylint: disable=protected-access
         ((player, s) for s in info_states))
 

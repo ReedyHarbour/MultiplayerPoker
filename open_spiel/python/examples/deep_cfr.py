@@ -42,7 +42,7 @@ flags.DEFINE_string("game_name", "kuhn_poker", "Name of the game")
 
 def main(unused_argv):
   logging.info("Loading %s", FLAGS.game_name)
-  game = pyspiel.load_game(FLAGS.game_name)
+  game = pyspiel.load_game(FLAGS.game_name, {'players': 3})
   with tf.Session() as sess:
     deep_cfr_solver = deep_cfr.DeepCFRSolver(
         sess,
@@ -76,11 +76,12 @@ def main(unused_argv):
     logging.info("Deep CFR in '%s' - NashConv: %s", FLAGS.game_name, conv)
 
     average_policy_values = expected_game_score.policy_value(
-        game.new_initial_state(), [average_policy] * 2)
+        game.new_initial_state(), [average_policy] * 3)
     print("Computed player 0 value: {}".format(average_policy_values[0]))
-    print("Expected player 0 value: {}".format(-1 / 18))
+    # print("Expected player 0 value: {}".format(-1 / 18))
     print("Computed player 1 value: {}".format(average_policy_values[1]))
-    print("Expected player 1 value: {}".format(1 / 18))
+    # print("Expected player 1 value: {}".format(1 / 18))
+    print("Computed player 2 value: {}".format(average_policy_values[2]))
 
 
 if __name__ == "__main__":

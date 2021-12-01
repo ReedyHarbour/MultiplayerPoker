@@ -37,9 +37,9 @@ flags.DEFINE_enum(
     ["external", "outcome"],
     "Sampling for the MCCFR solver",
 )
-flags.DEFINE_integer("iterations", 50, "Number of iterations")
+flags.DEFINE_integer("iterations", 10000, "Number of iterations")
 flags.DEFINE_string("game", "kuhn_poker", "Name of the game")
-flags.DEFINE_integer("players", 2, "Number of players")
+flags.DEFINE_integer("players", 5, "Number of players")
 
 MODEL_FILE_NAME = "{}_sampling_mccfr_solver.pickle"
 
